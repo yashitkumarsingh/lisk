@@ -26,17 +26,10 @@ var extractHeaders = require('./api/ws/workers/middlewares/handshake')
 var emitMiddleware = require('./api/ws/workers/middlewares/emit');
 var PeersUpdateRules = require('./api/ws/workers/peers_update_rules');
 var Rules = require('./api/ws/workers/rules');
+var PeerConnectionPool = require('./api/ws/workers/peer_connection_pool');
 var failureCodes = require('./api/ws/rpc/failure_codes');
 var Logger = require('./logger');
 var config = require('./config.json');
-
-const onEventRequest = () => {
-	console.log('onEventRequest');
-};
-
-const onRPCRequest = () => {
-	console.log('onRPCRequest');
-};
 
 /**
  * Instantiate the SocketCluster SCWorker instance with custom logic
@@ -62,9 +55,9 @@ SCWorker.create({
 				},
 
 				slaveWAMPServer: [
-					'logger',
+					'peerConnectionPool',
 					function(scope, cb) {
-						new SlaveWAMPServer(self, 20e3, cb, onRPCRequest, onEventRequest);
+						new SlaveWAMPServer(self, 20e3, cb);
 					},
 				],
 
@@ -96,6 +89,21 @@ SCWorker.create({
 					'config',
 					function(scope, cb) {
 						new System(cb, { config: scope.config });
+					},
+				],
+
+				peerConnectionPool: [
+					'system',
+					'logger',
+					'peersUpdateRules',
+					function(scope, cb) {
+						cb(
+							null,
+							new PeerConnectionPool({
+								system: scope.system,
+								logger: scope.logger,
+							})
+						);
 					},
 				],
 
@@ -239,6 +247,33 @@ SCWorker.create({
 						}
 					);
 				}
+
+				const onOutboundRPC = (payload, callback) => {
+					scope.peerConnectionPool.addPeer({
+						nonce: payload.peerNonce,
+					});
+					scope.peerConnectionPool.callPeer(
+						payload.peerNonce,
+						payload.procedure,
+						payload.data,
+						callback
+					);
+				};
+
+				scope.slaveWAMPServer.setOutboundRPCHandler(onOutboundRPC);
+
+				const onOutboundEvent = payload => {
+					scope.peerConnectionPool.addPeer({
+						nonce: payload.peerNonce,
+					});
+					scope.peerConnectionPool.emitToPeer(
+						payload.peerNonce,
+						payload.procedure,
+						payload.data
+					);
+				};
+
+				scope.slaveWAMPServer.setOutboundEventHandler(onOutboundEvent);
 
 				scope.logger.debug(`Worker pid ${process.pid} started`);
 			}

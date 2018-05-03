@@ -14,7 +14,6 @@
 
 'use strict';
 
-const _ = require('lodash');
 const scClient = require('socketcluster-client');
 const WAMPClient = require('wamp-socket-cluster/WAMPClient');
 const failureCodes = require('../../../api/ws/rpc/failure_codes');

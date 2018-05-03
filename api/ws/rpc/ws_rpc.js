@@ -15,7 +15,6 @@
 'use strict';
 
 const _ = require('lodash');
-const masterToSlaveSender = require('./master_to_slave_sender');
 
 let wsServer = null;
 
@@ -102,7 +101,15 @@ const wsRPC = {
 						data
 					);
 
-					const sendPayload = Object.assign({}, { data, rpc: true, procedure: rpcProcedureName });
+					const sendPayload = Object.assign(
+						{},
+						{
+							data,
+							rpc: true,
+							procedure: rpcProcedureName,
+							peerNonce: peer.nonce,
+						}
+					);
 					wsServer.socketCluster.sendToWorker(0, sendPayload, rpcCallback);
 				};
 				return peerExtendedWithRPC;
@@ -119,7 +126,15 @@ const wsRPC = {
 						`[Outbound socket :: emit] Peer event '${eventProcedureName}' called with data`,
 						data
 					);
-					const emitPayload = Object.assign({}, { data, event: true, procedure: eventProcedureName });
+					const emitPayload = Object.assign(
+						{},
+						{
+							data,
+							event: true,
+							procedure: eventProcedureName,
+							peerNonce: peer.nonce,
+						}
+					);
 					wsServer.socketCluster.sendToWorker(0, emitPayload);
 				};
 				return peerExtendedWithPublish;

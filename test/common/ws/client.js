@@ -16,7 +16,7 @@
 
 const testConfig = require('../../data/config.json');
 const System = require('../../../modules/system');
-const connect = require('../../../api/ws/rpc/connect');
+const connect = require('../../../api/ws/workers/connect');
 const WSServerMaster = require('./server_master');
 
 /**

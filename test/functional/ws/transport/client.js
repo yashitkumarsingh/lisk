@@ -16,7 +16,7 @@
 
 require('../../functional.js');
 const MasterWAMPServer = require('wamp-socket-cluster/MasterWAMPServer');
-const connect = require('../../../../api/ws/rpc/connect');
+const connect = require('../../../../api/ws/workers/connect');
 const wsRPC = require('../../../../api/ws/rpc/ws_rpc').wsRPC;
 const transport = require('../../../../api/ws/transport');
 const System = require('../../../../modules/system');
