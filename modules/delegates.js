@@ -76,7 +76,7 @@ class Delegates {
 				forging: {
 					secret: scope.config.forging.secret,
 					force: scope.config.forging.force,
-					defaultKey: scope.config.forging.defaultKey,
+					defaultPassword: scope.config.forging.defaultPassword,
 					access: {
 						whiteList: scope.config.forging.access.whiteList,
 					},
@@ -322,20 +322,128 @@ __private.forge = function(cb) {
 };
 
 /**
- * Returns the decrypted secret by deciphering encrypted secret with the key provided using aes-256-cbc algorithm.
+ * Parses an encrypted secret string into its component parts.
+ *
+ * @private
+ * @param {string} encryptedSecret - String containing components of the encrypted secret
+ * @returns {object} Parsed encrypted secret
+ */
+const parseEncryptedSecret = encryptedSecret => {
+	const keyValuePairs = encryptedSecret
+		.split('&')
+		.map(pair => pair.split('='))
+		.reduce(
+			(obj, [key, value]) => Object.assign({}, obj, { [key]: value }),
+			{}
+		);
+
+	const { salt, cipherText, iv, tag } = keyValuePairs;
+	const iterations =
+		keyValuePairs.iterations !== undefined
+			? parseInt(keyValuePairs.iterations, 10)
+			: null;
+
+	return {
+		iterations,
+		salt,
+		cipherText,
+		iv,
+		tag,
+	};
+};
+
+/**
+ * Validates an encrypted secret string, ensuring that all expected keys are present.
+ *
+ * @private
+ * @param {string} encryptedSecret - String containing components of the encrypted secret
+ * @throws {Error} If a required key is missing.
+ * @returns {boolean} true
+ */
+const validateEncryptedSecret = encryptedSecret => {
+	const humanReadableKeys = {
+		cipherText: 'cipher text',
+		iv: 'IV',
+	};
+	return ['salt', 'cipherText', 'iv', 'tag'].every(key => {
+		if (!encryptedSecret[key]) {
+			const humanReadableKey = humanReadableKeys[key] || key;
+			throw new Error(`No ${humanReadableKey} provided`);
+		}
+		return true;
+	});
+};
+
+/**
+ * Converts a tag to a Buffer, throwing an error if the tag is the wrong length.
+ *
+ * @private
+ * @param {string} tag - Hex string-formatted tag
+ * @throws {Error} If tag has been shortened or is otherwise the wrong length.
+ * @returns {Buffer} Tag
+ */
+const getTagBuffer = tag => {
+	const tagBuffer = Buffer.from(tag, 'hex');
+	if (tagBuffer.length !== 16) {
+		throw new Error('Tag must be 16 bytes');
+	}
+	return tagBuffer;
+};
+
+const PBKDF2_ITERATIONS = 1e6;
+const PBKDF2_KEYLEN = 32;
+const PBKDF2_HASH_FUNCTION = 'sha256';
+const CIPHER_ALGORITHM = 'aes-256-gcm';
+
+/**
+ * Derives the key to be used in the decryption from the provided password using the salt and optional number of iterations.
+ *
+ * @private
+ * @param {string} password - Password used to derive the key
+ * @param {Buffer} salt - Salt used when deriving the key
+ * @param {number} iterations - Optional number of iterations to use (default 1,000,000)
+ * @returns {Buffer} Key derived from the password
+ */
+const getKeyFromPassword = (password, salt, iterations) =>
+	crypto.pbkdf2Sync(
+		password,
+		salt,
+		iterations || PBKDF2_ITERATIONS,
+		PBKDF2_KEYLEN,
+		PBKDF2_HASH_FUNCTION
+	);
+
+/**
+ * Returns the decrypted secret by deciphering encrypted secret with the password provided using aes-256-gcm algorithm.
  *
  * @private
  * @param {string} encryptedSecret
- * @param {string} key
- * @throws {error} If unable to decrypt using key.
- * @returns {string} decryptedSecret
+ * @param {string} password
+ * @throws {error} If unable to decrypt using password.
+ * @returns {string} Decrypted secret
  * @todo Add description for the params
  */
-__private.decryptSecret = function(encryptedSecret, key) {
-	const decipher = crypto.createDecipher('aes-256-cbc', key);
-	let decryptedSecret = decipher.update(encryptedSecret, 'hex', 'utf8');
-	decryptedSecret += decipher.final('utf8');
-	return decryptedSecret;
+__private.decryptSecret = function(encryptedSecret, password) {
+	const parsedSecret = parseEncryptedSecret(encryptedSecret);
+	validateEncryptedSecret(parsedSecret);
+	const { tag, salt, iv, iterations, cipherText } = parsedSecret;
+	const tagBuffer = getTagBuffer(tag);
+	const key = getKeyFromPassword(
+		password,
+		Buffer.from(salt, 'hex'),
+		iterations
+	);
+
+	const decipher = crypto.createDecipheriv(
+		CIPHER_ALGORITHM,
+		key,
+		Buffer.from(iv, 'hex')
+	);
+	decipher.setAuthTag(tagBuffer);
+	const firstChunk = decipher.update(Buffer.from(cipherText, 'hex'));
+	const decrypted = Buffer.concat([firstChunk, decipher.final()]);
+
+	return decrypted.toString();
 };
 
 /**
@@ -474,7 +582,7 @@ __private.loadDelegates = function(cb) {
 		!secretsList ||
 		!secretsList.length ||
 		!library.config.forging.force ||
-		!library.config.forging.defaultKey
+		!library.config.forging.defaultPassword
 	) {
 		return setImmediate(cb);
 	}
@@ -493,15 +601,14 @@ __private.loadDelegates = function(cb) {
 			try {
 				secret = __private.decryptSecret(
 					encryptedItem.encryptedSecret,
-					library.config.forging.defaultKey
+					library.config.forging.defaultPassword
 				);
-			} catch (e) {
+			} catch (error) {
 				return setImmediate(
 					seriesCb,
-					[
-						'Invalid encryptedSecret for publicKey:',
-						encryptedItem.publicKey,
-					].join(' ')
+					`Invalid encryptedSecret for publicKey: ${encryptedItem.publicKey}. ${
+						error.message
+					}`
 				);
 			}
 
@@ -513,7 +620,12 @@ __private.loadDelegates = function(cb) {
 			);
 
 			if (keypair.publicKey.toString('hex') !== encryptedItem.publicKey) {
-				return setImmediate(seriesCb, 'Public keys do not match');
+				return setImmediate(
+					seriesCb,
+					`Invalid encryptedSecret for publicKey: ${
+						encryptedItem.publicKey
+					}. Public keys do not match`
+				);
 			}
 
 			modules.accounts.getAccount(
@@ -564,12 +676,12 @@ __private.loadDelegates = function(cb) {
  * Updates the forging status of an account, valid actions are enable and disable.
  *
  * @param {publicKey} publicKey - Public key of delegate
- * @param {string} secretKey - Key used to decrypt encrypted passphrase
+ * @param {string} password - Password used to decrypt encrypted passphrase
  * @param {function} cb - Callback function
  * @returns {setImmediateCallback} cb
  * @todo Add description for the return value
  */
-Delegates.prototype.toggleForgingStatus = function(publicKey, secretKey, cb) {
+Delegates.prototype.toggleForgingStatus = function(publicKey, password, cb) {
 	const encryptedList = library.config.forging.secret;
 	const encryptedItem = _.find(
 		encryptedList,
@@ -585,10 +697,10 @@ Delegates.prototype.toggleForgingStatus = function(publicKey, secretKey, cb) {
 		try {
 			decryptedSecret = __private.decryptSecret(
 				encryptedItem.encryptedSecret,
-				secretKey
+				password
 			);
 		} catch (e) {
-			return setImmediate(cb, 'Invalid key and public key combination');
+			return setImmediate(cb, 'Invalid password and public key combination');
 		}
 
 		keypair = library.ed.makeKeypair(
@@ -605,7 +717,7 @@ Delegates.prototype.toggleForgingStatus = function(publicKey, secretKey, cb) {
 	}
 
 	if (keypair.publicKey.toString('hex') !== publicKey) {
-		return setImmediate(cb, 'Invalid key and public key combination');
+		return setImmediate(cb, 'Invalid password and public key combination');
 	}
 
 	if (__private.keypairs[keypair.publicKey.toString('hex')]) {

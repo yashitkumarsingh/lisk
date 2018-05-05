@@ -35,7 +35,7 @@ var validKeypair = ed.makeKeypair(
 
 var senderHash = crypto
 	.createHash('sha256')
-	.update(accountFixtures.genesis.password, 'utf8')
+	.update(accountFixtures.genesis.passphrase, 'utf8')
 	.digest();
 var senderKeypair = ed.makeKeypair(senderHash);
 
@@ -58,7 +58,6 @@ var validSender = {
 	missedBlocks: 0,
 	fees: 0,
 	rewards: 0,
-	virgin: 0,
 };
 
 var validTransaction = {

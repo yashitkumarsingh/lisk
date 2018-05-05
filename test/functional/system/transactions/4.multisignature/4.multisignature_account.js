@@ -28,7 +28,7 @@ describe('system test (type 4) - effect of multisignature registration on memory
 	var multisigTransaction;
 	var creditTransaction = lisk.transaction.transfer({
 		amount: 1000 * constants.normalizer,
-		passphrase: accountFixtures.genesis.password,
+		passphrase: accountFixtures.genesis.passphrase,
 		recipientId: multisigAccount.address,
 	});
 	var signer1 = randomUtil.account();
@@ -418,6 +418,7 @@ describe('system test (type 4) - effect of multisignature registration on memory
 				library.logic.transaction.process(
 					multisigTransaction2,
 					multisigSender,
+					null,
 					done
 				);
 			});
@@ -437,6 +438,7 @@ describe('system test (type 4) - effect of multisignature registration on memory
 					library.logic.transaction.verify(
 						multisigTransaction2,
 						multisigSender,
+						null,
 						done
 					);
 				});
