@@ -102,7 +102,10 @@ const wsRPC = {
 						data
 					);
 
-					const sendPayload = Object.assign({}, { data, rpc: true, procedure: rpcProcedureName });
+					const sendPayload = Object.assign(
+						{},
+						{ data, rpc: true, procedure: rpcProcedureName }
+					);
 					wsServer.socketCluster.sendToWorker(0, sendPayload, rpcCallback);
 				};
 				return peerExtendedWithRPC;
@@ -119,7 +122,10 @@ const wsRPC = {
 						`[Outbound socket :: emit] Peer event '${eventProcedureName}' called with data`,
 						data
 					);
-					const emitPayload = Object.assign({}, { data, event: true, procedure: eventProcedureName });
+					const emitPayload = Object.assign(
+						{},
+						{ data, event: true, procedure: eventProcedureName }
+					);
 					wsServer.socketCluster.sendToWorker(0, emitPayload);
 				};
 				return peerExtendedWithPublish;
