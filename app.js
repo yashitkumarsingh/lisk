@@ -587,17 +587,15 @@ d.run(() => {
 						workersControllerPath,
 						scope.config.ssl.enabled,
 						scope.logger,
-						() => {
-							scope.network.app.rpc = master.initializeWSClient(
-								scope.socketCluster,
-								scope.config.version,
-								scope.config.minVersion,
-								scope.config.nethash,
-								scope.config.wsPort,
-								scope.config.nonce
-							);
-							cb();
-						}
+						cb
+					);
+					scope.network.app.rpc = master.initializeWSClient(
+						scope.socketCluster,
+						scope.config.version,
+						scope.config.minVersion,
+						scope.config.nethash,
+						scope.config.wsPort,
+						scope.config.nonce
 					);
 				},
 			],
