@@ -26,18 +26,10 @@ var extractHeaders = require('./api/ws/workers/middlewares/handshake')
 var emitMiddleware = require('./api/ws/workers/middlewares/emit');
 var PeersUpdateRules = require('./api/ws/workers/peers_update_rules');
 var Rules = require('./api/ws/workers/rules');
+var PeerConnectionPool = require('./api/ws/workers/peer_connection_pool');
 var failureCodes = require('./api/ws/rpc/failure_codes');
 var Logger = require('./logger');
 var config = require('./config.json');
-
-
-const onEventRequest = () => {
-	console.log('onEventRequest');
-};
-
-const onRPCRequest = () => {
-	console.log('onRPCRequest');
-};
 
 /**
  * Instantiate the SocketCluster SCWorker instance with custom logic
@@ -63,9 +55,9 @@ SCWorker.create({
 				},
 
 				slaveWAMPServer: [
-					'logger',
+					'peerConnectionPool',
 					function(scope, cb) {
-						new SlaveWAMPServer(self, 20e3, cb, onRPCRequest, onEventRequest);
+						new SlaveWAMPServer(self, 20e3, cb);
 					},
 				],
 
@@ -100,6 +92,21 @@ SCWorker.create({
 					},
 				],
 
+				peerConnectionPool: [
+					'system',
+					'logger',
+					'peersUpdateRules',
+					function(scope, cb) {
+						cb(
+							null,
+							new PeerConnectionPool({
+								system: scope.system,
+								logger: scope.logger,
+							})
+						);
+					},
+				],
+
 				handshake: [
 					'system',
 					function(scope, cb) {
@@ -111,7 +118,8 @@ SCWorker.create({
 				scServer.addMiddleware(
 					scServer.MIDDLEWARE_HANDSHAKE_WS,
 					(req, next) => {
-						scope.handshake(extractHeaders(req), (err, peer) => {
+						req.peerHeaders = extractHeaders(req);
+						scope.handshake(req.peerHeaders, (err, peer) => {
 							if (err) {
 								// Set a custom property on the HTTP request object; we will check this property and handle
 								// this issue later.
@@ -131,6 +139,7 @@ SCWorker.create({
 				scServer.addMiddleware(scServer.MIDDLEWARE_EMIT, emitMiddleware);
 
 				scServer.on('handshake', socket => {
+					socket.nonce = socket.request.peerHeaders.nonce;
 					socket.on('message', message => {
 						scope.logger.trace(
 							`[Inbound socket :: message] Received message from ${
@@ -171,6 +180,11 @@ SCWorker.create({
 							socket.request.remoteAddress
 						} succeeded`
 					);
+				});
+
+				scServer.on('connection', socket => {
+					scope.slaveWAMPServer.upgradeToWAMP(socket);
+					socket.on('disconnect', removePeerConnection.bind(null, socket));
 
 					updatePeerConnection(
 						Rules.UPDATES.INSERT,
@@ -187,11 +201,6 @@ SCWorker.create({
 					);
 				});
 
-				scServer.on('connection', socket => {
-					scope.slaveWAMPServer.upgradeToWAMP(socket);
-					socket.on('disconnect', removePeerConnection.bind(null, socket));
-				});
-
 				function removePeerConnection(socket, code) {
 					scope.logger.trace(
 						`[Inbound socket :: disconnect] Peer socket from ${
@@ -202,7 +211,7 @@ SCWorker.create({
 					if (failureCodes.errorMessages[code]) {
 						return;
 					}
-					var headers = extractHeaders(socket.request);
+					var headers = socket.request.peerHeaders;
 					scope.slaveWAMPServer.onSocketDisconnect(socket);
 					updatePeerConnection(
 						Rules.UPDATES.REMOVE,
@@ -238,6 +247,33 @@ SCWorker.create({
 						}
 					);
 				}
+
+				const onOutboundRPC = (payload, callback) => {
+					scope.peerConnectionPool.addPeer({
+						nonce: payload.peerNonce,
+					});
+					scope.peerConnectionPool.callPeer(
+						payload.peerNonce,
+						payload.procedure,
+						payload.data,
+						callback
+					);
+				};
+
+				scope.slaveWAMPServer.setOutboundRPCHandler(onOutboundRPC);
+
+				const onOutboundEvent = payload => {
+					scope.peerConnectionPool.addPeer({
+						nonce: payload.peerNonce,
+					});
+					scope.peerConnectionPool.emitToPeer(
+						payload.peerNonce,
+						payload.procedure,
+						payload.data
+					);
+				};
+
+				scope.slaveWAMPServer.setOutboundEventHandler(onOutboundEvent);
 
 				scope.logger.debug(`Worker pid ${process.pid} started`);
 			}

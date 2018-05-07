@@ -15,7 +15,7 @@
 'use strict';
 
 const sinon = require('sinon');
-const disconnect = require('../../../../../api/ws/rpc/disconnect');
+const disconnect = require('../../../../../api/ws/workers/disconnect');
 const prefixedPeer = require('../../../../fixtures/peers').randomNormalizedPeer;
 
 describe('disconnect', () => {
