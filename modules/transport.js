@@ -20,7 +20,7 @@ let Broadcaster = require('../logic/broadcaster.js');
 const constants = require('../helpers/constants.js');
 const failureCodes = require('../api/ws/rpc/failure_codes');
 const PeerUpdateError = require('../api/ws/rpc/failure_codes').PeerUpdateError;
-const Rules = require('../api/ws/workers/rules');
+const Rules = require('../api/ws/workers/peers_update_rules');
 // eslint-disable-next-line prefer-const
 let wsRPC = require('../api/ws/rpc/ws_rpc').wsRPC;
 

@@ -18,9 +18,8 @@ var Peer = require('../../../logic/peer');
 var failureCodes = require('../rpc/failure_codes');
 var PeerUpdateError = require('../rpc/failure_codes').PeerUpdateError;
 var swaggerHelper = require('../../../helpers/swagger');
-var connectionsTable = require('./connections_table');
+var connections = require('./connections');
 var SlaveToMasterSender = require('./slave_to_master_sender');
-var Rules = require('./rules');
 
 var definitions = swaggerHelper.getSwaggerSpec().definitions;
 var z_schema = swaggerHelper.getValidator();
@@ -44,137 +43,56 @@ var self;
  */
 function PeersUpdateRules(slaveWAMPServer) {
 	this.slaveToMasterSender = new SlaveToMasterSender(slaveWAMPServer);
-	this.rules = new Rules(this.insert, this.remove, this.block);
 	self = this;
 }
 
 /**
- * Description of the function.
- *
+ * Insert peer on a master process
  * @param {Object} peer
- * @param {string} connectionId
  * @param {function} cb
- * @todo Add description for the function and the params
- * @todo Add @returns tag
  */
-PeersUpdateRules.prototype.insert = function(peer, connectionId, cb) {
-	try {
-		connectionsTable.add(peer.nonce, connectionId);
-		peer.state = Peer.STATE.CONNECTED;
-		self.slaveToMasterSender.send(
-			'updatePeer',
-			Rules.UPDATES.INSERT,
-			peer,
-			err => {
-				if (err) {
-					connectionsTable.remove(peer.nonce);
-					if (!err.code) {
-						err = new PeerUpdateError(
-							failureCodes.ON_MASTER.UPDATE.TRANSPORT,
-							failureCodes.errorMessages[
-								failureCodes.ON_MASTER.UPDATE.TRANSPORT
-							],
-							err
-						);
-					}
-				}
-				return setImmediate(cb, err);
-			}
-		);
-	} catch (ex) {
-		return setImmediate(cb, ex);
-	}
-};
-
-/**
- * Description of the function.
- *
- * @param {Object} peer
- * @param {string} connectionId
- * @param {function} cb
- * @todo Add description for the function and the params
- * @todo Add @returns tag
- */
-PeersUpdateRules.prototype.remove = function(peer, connectionId, cb) {
-	try {
-		connectionsTable.remove(peer.nonce);
-		self.slaveToMasterSender.send(
-			'updatePeer',
-			Rules.UPDATES.REMOVE,
-			peer,
-			err => {
-				if (err && !err.code) {
-					connectionsTable.add(peer.nonce, connectionId);
+PeersUpdateRules.prototype.insertOnMaster = function(peer, cb) {
+	peer.state = Peer.STATE.CONNECTED;
+	self.slaveToMasterSender.send(
+		'updatePeer',
+		Rules.UPDATES.INSERT,
+		peer,
+		err => {
+			if (err) {
+				if (!err.code) {
 					err = new PeerUpdateError(
 						failureCodes.ON_MASTER.UPDATE.TRANSPORT,
 						failureCodes.errorMessages[failureCodes.ON_MASTER.UPDATE.TRANSPORT],
 						err
 					);
 				}
-				return setImmediate(cb, err);
 			}
-		);
-	} catch (ex) {
-		return setImmediate(cb, ex);
-	}
-};
-
-/**
- * Description of the function.
- *
- * @param {number} code
- * @param {Object} peer
- * @param {string} connectionId
- * @param {function} cb
- * @todo Add description for the function and the params
- * @todo Add @returns tag
- */
-PeersUpdateRules.prototype.block = function(code, peer, connectionId, cb) {
-	return setImmediate(
-		cb,
-		new PeerUpdateError(code, failureCodes.errorMessages[code])
+			return setImmediate(cb, err);
+		}
 	);
 };
 
 /**
- * Description of the object.
+ * Remove peer on a master process
+ * @param {Object} peer
+ * @param {function} cb
  */
-PeersUpdateRules.prototype.internal = {
-	/**
-	 * Description of the function.
-	 *
-	 * @memberof api.ws.workers.PeersUpdateRules
-	 * @param {number} updateType
-	 * @param {Object} peer
-	 * @param {string} connectionId
-	 * @param {function} cb
-	 * @todo Add description for the function and the params
-	 * @todo Add @returns tag
-	 */
-	update(updateType, peer, connectionId, cb) {
-		self.slaveToMasterSender.getPeer(peer.nonce, (err, onMasterPresence) => {
-			if (err) {
-				return setImmediate(
-					cb,
-					new PeerUpdateError(
-						failureCodes.ON_MASTER.UPDATE.CHECK_PRESENCE,
-						failureCodes.errorMessages[
-							failureCodes.ON_MASTER.UPDATE.CHECK_PRESENCE
-						],
-						err
-					)
+PeersUpdateRules.prototype.removeOnMaster = function(peer, cb) {
+	self.slaveToMasterSender.send(
+		'updatePeer',
+		Rules.UPDATES.REMOVE,
+		peer,
+		err => {
+			if (err && !err.code) {
+				err = new PeerUpdateError(
+					failureCodes.ON_MASTER.UPDATE.TRANSPORT,
+					failureCodes.errorMessages[failureCodes.ON_MASTER.UPDATE.TRANSPORT],
+					err
 				);
 			}
-			var isNoncePresent = !!connectionsTable.getNonce(connectionId);
-			var isConnectionIdPresent = !!connectionsTable.getConnectionId(
-				peer.nonce
-			);
-
-			self.rules.rules[updateType][isNoncePresent][isConnectionIdPresent][
-				onMasterPresence
-			](peer, connectionId, cb);
-		});
-	},
+			return setImmediate(cb, err);
+		}
+	);
 };
 
 /**
@@ -198,18 +116,19 @@ PeersUpdateRules.prototype.external = {
 			if (err) {
 				return setImmediate(cb, err[0].message);
 			}
-			if (
-				request.socketId !==
-				connectionsTable.getConnectionId(request.data.nonce)
-			) {
+			if (!request.peerObject) {
+				return console.error('External update request called without pre-handshake process');
+			}
+			const peerString = request.peerObject.ip + ':' + request.peerObject.wsPort;
+			if (!connections[peerString]) {
 				return setImmediate(
 					cb,
-					new Error('Connection id does not match with corresponding peer')
+					new Error('External update request called for non-existing connection')
 				);
 			}
 			self.slaveToMasterSender.send(
 				'updatePeer',
-				Rules.UPDATES.INSERT,
+				PeersUpdateRules.UPDATES.INSERT,
 				request.data,
 				cb
 			);
@@ -217,4 +136,8 @@ PeersUpdateRules.prototype.external = {
 	},
 };
 
+PeersUpdateRules.UPDATES = {
+	INSERT: 0,
+	REMOVE: 1
+};
 module.exports = PeersUpdateRules;
