@@ -9,6 +9,24 @@ const TIMEOUT = 10000;
 var connect = null;
 
 const generateConnectionOptions = peer => {
+	const systemHeaders = System.getHeaders();
+	const queryParams = {};
+
+	if (systemHeaders.version != null) {
+		queryParams.version = systemHeaders.version;
+	}
+	if (systemHeaders.wsPort != null) {
+		queryParams.wsPort = systemHeaders.wsPort;
+	}
+	if (systemHeaders.httpPort != null) {
+		queryParams.httpPort = systemHeaders.httpPort;
+	}
+	if (systemHeaders.nethash != null) {
+		queryParams.nethash = systemHeaders.nethash;
+	}
+	if (systemHeaders.nonce != null) {
+		queryParams.nonce = systemHeaders.nonce;
+	}
 	return {
 		autoConnect: false, // Lazy connection establishment
 		autoReconnect: false,
@@ -17,7 +35,7 @@ const generateConnectionOptions = peer => {
 		pingTimeoutDisabled: true,
 		port: peer.wsPort,
 		hostname: peer.ip,
-		query: System.getHeaders(),
+		query: queryParams,
 		multiplex: true,
 	};
 };

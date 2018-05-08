@@ -37,6 +37,7 @@ module.exports = {
 		const webSocketConfig = {
 			port: port,
 			workers: workersNumber,
+			host: '0.0.0.0',
 			workerController: workersPath,
 			wsEngine: 'sc-uws',
 			appName: 'lisk',
