@@ -14,154 +14,61 @@
 
 'use strict';
 
-const scClient = require('socketcluster-client');
-const WAMPClient = require('wamp-socket-cluster/WAMPClient');
-const failureCodes = require('../../../api/ws/rpc/failure_codes');
-const System = require('../../../modules/system');
+const connections = require('./connections');
 const Peer = require('../../../logic/peer');
 
-const TIMEOUT = 2000;
-const SOCKET_DESTROY_TIMEOUT = 10000; // Allow sockets to be reused in case of frequent reconnect
+const logs = require('./logs');
 
-const wampClient = new WAMPClient(TIMEOUT); // Timeout failed requests after 1 second
-const socketConnections = {};
+class Connect {
+	constructor(wampClient, wampServer, peersUpdateRules) {
+		this.wampClient = wampClient;
+		this.wampServer = wampServer;
+		this.peersUpdateRules = peersUpdateRules;
+	}
 
-const connect = (peer, logger) => {
-	connectSteps.addConnectionOptions(peer);
-	connectSteps.addSocket(peer, logger);
+	// Private
+	upgradeSocket(socket) {
+		this.wampClient.upgradeToWAMP(socket);
+		this.wampServer.upgradeToWAMP(socket);
+	}
 
-	connectSteps.upgradeSocket(peer);
-
-	connectSteps.registerSocketListeners(peer, logger);
-
-	return peer;
-};
-
-const connectSteps = {
-	addConnectionOptions: peer => {
-		peer.connectionOptions = {
-			autoConnect: false, // Lazy connection establishment
-			autoReconnect: false,
-			connectTimeout: TIMEOUT,
-			ackTimeout: TIMEOUT,
-			pingTimeoutDisabled: true,
-			port: peer.wsPort,
-			hostname: peer.ip,
-			query: System.getHeaders(),
-			multiplex: true,
-		};
-		return peer;
-	},
-
-	addSocket: (peer, logger) => {
-		peer.socket = scClient.connect(peer.connectionOptions);
-
-		if (peer.socket && Object.keys(socketConnections).length < 1000) {
-			const hostname = peer.socket.options.hostname;
-			if (!socketConnections[hostname]) {
-				socketConnections[hostname] = { closed: 0, open: 0, disconnect: 0 };
-			}
-
-			if (peer.socket.state === 'closed') {
-				socketConnections[hostname].closed += 1;
-			} else if (peer.socket.state === 'open') {
-				socketConnections[hostname].open += 1;
-			} else if (peer.socket.state === 'disconnect') {
-				socketConnections[hostname].disconnect += 1;
-			}
-
-			logger.trace(
-				`${socketConnections[hostname].closed}:closed, ${
-					socketConnections[hostname].open
-				}:open and ${
-					socketConnections[hostname].disconnect
-				}:disconnect websocket connection to peer ${
-					peer.socket.options.hostname
-				}.`
-			);
-		}
-
-		return peer;
-	},
-
-	upgradeSocket: peer => {
-		wampClient.upgradeToWAMP(peer.socket);
-		return peer;
-	},
-
-	registerSocketListeners: (peer, logger) => {
-		const socket = peer.socket;
-
+	registerSocketListeners(socket, peerObject) {
+		const peer = new Peer(peerObject);
+		// Possible ToDo: connection timeout listener to discard/notify about success through callback
 		socket.on('connect', () => {
-			clearTimeout(socket.destroyTimeout);
-			logger.trace(
-				`[Outbound socket :: connect] Peer connection to ${peer.ip} established`
-			);
+			logs.listeners.connect(peer);
+			connections.insert(peer, socket, this.peersUpdateRules);
+		});
+
+		socket.on('close', (code, reason) => {
+			logs.listeners.close(peer, code, reason);
+			connections.remove(peer, this.peersUpdateRules);
 		});
 
 		socket.on('disconnect', () => {
-			logger.trace(
-				`[Outbound socket :: disconnect] Peer connection to ${
-					peer.ip
-				} disconnected`
-			);
+			logs.listeners.disconnect(peer);
 		});
 
-		// When handshake process will fail - disconnect
-		// ToDo: Use parameters code and description returned while handshake fails
 		socket.on('connectAbort', () => {
-			socket.disconnect(
-				failureCodes.HANDSHAKE_ERROR,
-				failureCodes.errorMessages[failureCodes.HANDSHAKE_ERROR]
-			);
+			// console.log('connection abort', arguments);
+			logs.listeners.connectionAbort(peer);
 		});
 
-		// When error on transport layer occurs - disconnect
 		socket.on('error', err => {
-			logger.debug(
-				`[Outbound socket :: error] Peer error from ${peer.ip} - ${err.message}`
-			);
-			socket.disconnect(
-				1000,
-				'Intentionally disconnected from peer because of error'
-			);
+			logs.listeners.error(peer, err);
 		});
 
-		// When WS connection ends - remove peer
-		socket.on('close', (code, reason) => {
-			logger.debug(
-				`[Outbound socket :: close] Peer connection to ${
-					peer.ip
-				} closed with code ${code} and reason - ${reason}`
-			);
-
-			if (peer.socket && peer.socket.state === peer.socket.CLOSED) {
-				peer.state = Peer.STATE.DISCONNECTED;
-			}
-			clearTimeout(socket.destroyTimeout);
-			socket.destroyTimeout = setTimeout(() => {
-				if (socket.state === socket.CLOSED || peer.socket !== socket) {
-					// If the socket is still closed after SOCKET_DESTROY_TIMEOUT
-					// (I.e. it hasn't been reopened since), then we will destroy
-					// it completely.
-					socket.destroy();
-					if (socket === peer.socket) {
-						delete peer.socket;
-					}
-				}
-			}, SOCKET_DESTROY_TIMEOUT);
-		});
-
-		// The 'message' event can be used to log all low-level WebSocket messages.
 		socket.on('message', message => {
-			logger.trace(
-				`[Outbound socket :: message] Peer message from ${
-					peer.ip
-				} received - ${message}`
-			);
+			logs.listeners.message.inbound(message, peer);
 		});
-		return peer;
-	},
-};
+		return socket;
+	}
 
-module.exports = connect;
+	// Public
+	registerSocket(socket, peer) {
+		this.upgradeSocket(socket);
+		this.registerSocketListeners(socket, peer);
+	}
+}
+
+module.exports = Connect;
