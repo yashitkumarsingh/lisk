@@ -107,7 +107,7 @@ const wsRPC = {
 							data,
 							rpc: true,
 							procedure: rpcProcedureName,
-							peerNonce: peer.nonce,
+							peer: peer.object(),
 						}
 					);
 					wsServer.socketCluster.sendToWorker(0, sendPayload, rpcCallback);
@@ -132,7 +132,7 @@ const wsRPC = {
 							data,
 							event: true,
 							procedure: eventProcedureName,
-							peerNonce: peer.nonce,
+							peer: peer.object(),
 						}
 					);
 					wsServer.socketCluster.sendToWorker(0, emitPayload);
