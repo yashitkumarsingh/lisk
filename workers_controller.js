@@ -14,22 +14,26 @@
 
 'use strict';
 
-var SCWorker = require('socketcluster/scworker');
-var async = require('async');
-var SlaveWAMPServer = require('wamp-socket-cluster/SlaveWAMPServer');
-var Peer = require('./logic/peer');
-var System = require('./modules/system');
-var Handshake = require('./api/ws/workers/middlewares/handshake').middleware
+const SCWorker = require('socketcluster/scworker');
+const async = require('async');
+const SlaveWAMPServer = require('wamp-socket-cluster/SlaveWAMPServer');
+const WAMPClient = require('wamp-socket-cluster/WAMPClient');
+const System = require('./modules/system');
+const Handshake = require('./api/ws/workers/middlewares/handshake').middleware
 	.Handshake;
-var extractHeaders = require('./api/ws/workers/middlewares/handshake')
+const extractHeaders = require('./api/ws/workers/middlewares/handshake')
 	.extractHeaders;
-var emitMiddleware = require('./api/ws/workers/middlewares/emit');
-var PeersUpdateRules = require('./api/ws/workers/peers_update_rules');
-var Rules = require('./api/ws/workers/rules');
-var PeerConnectionPool = require('./api/ws/workers/peer_connection_pool');
-var failureCodes = require('./api/ws/rpc/failure_codes');
-var Logger = require('./logger');
-var config = require('./config.json');
+const emitMiddleware = require('./api/ws/workers/middlewares/emit');
+const logs = require('./api/ws/workers/logs');
+const PeersUpdateRules = require('./api/ws/workers/peers_update_rules');
+const failureCodes = require('./api/ws/rpc/failure_codes');
+const Logger = require('./logger');
+const config = require('./config.json');
+
+const Client = require('./api/ws/workers/client/client');
+const Connect = require('./api/ws/workers/connect');
+
+console.log('hello moto');
 
 /**
  * Instantiate the SocketCluster SCWorker instance with custom logic
@@ -53,11 +57,39 @@ SCWorker.create({
 						})
 					);
 				},
-
-				slaveWAMPServer: [
-					'peerConnectionPool',
+				logs: [
+					'logger',
 					function(scope, cb) {
-						new SlaveWAMPServer(self, 20e3, cb);
+						logs.logger = scope.logger;
+						return cb(null, logs);
+					},
+				],
+				connect (cb) {
+					const TIMEOUT = 10000; // Timeout failed client requests after 1 second
+					return cb(
+						null,
+						new Connect(new WAMPClient(TIMEOUT), null, null)
+					);
+				},
+				client: [
+					'connect',
+					function(scope, cb) {
+						return cb(null, new Client(scope.connect));
+					},
+				],
+				slaveWAMPServer: [
+					'client',
+					function(scope, cb) {
+						new SlaveWAMPServer(
+							self,
+							20e3,
+							(err, slaveWAMPServer) => {
+								scope.connect.wampServer = slaveWAMPServer;
+								cb(null, slaveWAMPServer);
+							},
+							scope.client.onRPCRequest,
+							scope.client.onEventRequest
+						);
 					},
 				],
 
@@ -71,7 +103,9 @@ SCWorker.create({
 				peersUpdateRules: [
 					'slaveWAMPServer',
 					function(scope, cb) {
-						cb(null, new PeersUpdateRules(scope.slaveWAMPServer));
+						const peersUpdateRules = new PeersUpdateRules(scope.slaveWAMPServer);
+						scope.connect.wampServer = scope.slaveWAMPServer;
+						cb(null, peersUpdateRules);
 					},
 				],
 
@@ -89,21 +123,6 @@ SCWorker.create({
 					'config',
 					function(scope, cb) {
 						new System(cb, { config: scope.config });
-					},
-				],
-
-				peerConnectionPool: [
-					'system',
-					'logger',
-					'peersUpdateRules',
-					function(scope, cb) {
-						cb(
-							null,
-							new PeerConnectionPool({
-								system: scope.system,
-								logger: scope.logger,
-							})
-						);
 					},
 				],
 
@@ -136,16 +155,12 @@ SCWorker.create({
 					}
 				);
 
+				// ToDo: Asymetric! Client socket doesn't have it!
 				scServer.addMiddleware(scServer.MIDDLEWARE_EMIT, emitMiddleware);
 
 				scServer.on('handshake', socket => {
-					socket.nonce = socket.request.peerHeaders.nonce;
 					socket.on('message', message => {
-						scope.logger.trace(
-							`[Inbound socket :: message] Received message from ${
-								socket.request.remoteAddress
-							} - ${message}`
-						);
+						scope.logs.message.outbound(socket, message);
 					});
 					// We can access the HTTP request (which instantiated the WebSocket connection) using socket.request
 					// so we can access our custom socket.request.failedQueryValidation property here.
@@ -180,100 +195,9 @@ SCWorker.create({
 							socket.request.remoteAddress
 						} succeeded`
 					);
+
+					scope.connect.registerSocket(socket, socket.request.peerObject);
 				});
-
-				scServer.on('connection', socket => {
-					scope.slaveWAMPServer.upgradeToWAMP(socket);
-					socket.on('disconnect', removePeerConnection.bind(null, socket));
-
-					updatePeerConnection(
-						Rules.UPDATES.INSERT,
-						socket,
-						socket.request.peerObject,
-						onUpdateError => {
-							if (onUpdateError) {
-								socket.disconnect(
-									onUpdateError.code,
-									onUpdateError.description
-								);
-							}
-						}
-					);
-				});
-
-				function removePeerConnection(socket, code) {
-					scope.logger.trace(
-						`[Inbound socket :: disconnect] Peer socket from ${
-							socket.request.remoteAddress
-						} disconnected`
-					);
-
-					if (failureCodes.errorMessages[code]) {
-						return;
-					}
-					var headers = socket.request.peerHeaders;
-					scope.slaveWAMPServer.onSocketDisconnect(socket);
-					updatePeerConnection(
-						Rules.UPDATES.REMOVE,
-						socket,
-						new Peer(headers).object(),
-						() => {}
-					);
-				}
-
-				function updatePeerConnection(updateType, socket, peer, cb) {
-					scope.peersUpdateRules.internal.update(
-						updateType,
-						peer,
-						socket.id,
-						onUpdateError => {
-							var actionName = Object.keys(Rules.UPDATES)[updateType];
-							if (onUpdateError) {
-								scope.logger.warn(
-									`Peer ${actionName} error: code: ${
-										onUpdateError.code
-									}, message: ${
-										failureCodes.errorMessages[onUpdateError.code]
-									}, description: ${onUpdateError.description} on peer ${
-										peer.ip
-									}:${peer.wsPort}`
-								);
-							} else {
-								scope.logger.info(
-									`${actionName} peer - ${peer.ip}:${peer.wsPort} success`
-								);
-							}
-							return setImmediate(cb, onUpdateError);
-						}
-					);
-				}
-
-				const onOutboundRPC = (payload, callback) => {
-					scope.peerConnectionPool.addPeer({
-						nonce: payload.peerNonce,
-					});
-					scope.peerConnectionPool.callPeer(
-						payload.peerNonce,
-						payload.procedure,
-						payload.data,
-						callback
-					);
-				};
-
-				scope.slaveWAMPServer.setOutboundRPCHandler(onOutboundRPC);
-
-				const onOutboundEvent = payload => {
-					scope.peerConnectionPool.addPeer({
-						nonce: payload.peerNonce,
-					});
-					scope.peerConnectionPool.emitToPeer(
-						payload.peerNonce,
-						payload.procedure,
-						payload.data
-					);
-				};
-
-				scope.slaveWAMPServer.setOutboundEventHandler(onOutboundEvent);
 
 				scope.logger.debug(`Worker pid ${process.pid} started`);
 			}
