@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const config = require('../../config.json');
 const MasterWAMPServer = require('wamp-socket-cluster/MasterWAMPServer');
 const SocketCluster = require('socketcluster');
 const wsRPC = require('./rpc/ws_rpc').wsRPC;
@@ -54,8 +55,8 @@ module.exports = {
 			Object.assign(webSocketConfig, {
 				protocol: 'https',
 				protocolOptions: {
-					key: fs.readFileSync(scope.config.ssl.options.key),
-					cert: fs.readFileSync(scope.config.ssl.options.cert),
+					key: fs.readFileSync(config.ssl.options.key),
+					cert: fs.readFileSync(config.ssl.options.cert),
 					ciphers:
 						'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:DHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA256:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA',
 				},
