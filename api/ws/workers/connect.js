@@ -42,6 +42,9 @@ class Connect {
 
 		socket.on('close', (code, reason) => {
 			logs.listeners.close(peer, code, reason);
+			if (socket.destroy) {
+				socket.destroy();
+			}
 			connections.remove(peer, this.peersUpdateRules);
 		});
 
@@ -50,7 +53,6 @@ class Connect {
 		});
 
 		socket.on('connectAbort', () => {
-			// console.log('connection abort', arguments);
 			logs.listeners.connectionAbort(peer);
 		});
 
