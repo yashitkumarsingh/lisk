@@ -55,7 +55,7 @@ SCWorker.create({
 				},
 
 				slaveWAMPServer: [
-					'peerConnectionPool',
+					'logger',
 					function(scope, cb) {
 						new SlaveWAMPServer(self, 20e3, cb);
 					},
