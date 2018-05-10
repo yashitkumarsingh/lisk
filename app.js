@@ -595,6 +595,7 @@ d.run(() => {
 						scope.config.minVersion,
 						scope.config.nethash,
 						scope.config.wsPort,
+						scope.config.httpPort,
 						scope.config.nonce
 					);
 				},

@@ -48,7 +48,7 @@ SlaveToMasterSender.prototype.send = function(
 			authKey: this.slaveWAMPServer.worker.options.authKey,
 			updateType,
 		},
-		peer.nonce,
+		peer.string,
 		cb
 	);
 };

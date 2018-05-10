@@ -12,7 +12,8 @@ module.exports = {
 		version,
 		minVersion,
 		nethash,
-		port,
+		wsPort,
+		httpPort,
 		nonce
 	) => {
 		return wsRPC.setServer(
@@ -20,7 +21,8 @@ module.exports = {
 				version,
 				minVersion,
 				nethash,
-				port,
+				wsPort,
+				httpPort,
 				nonce,
 			})
 		);
