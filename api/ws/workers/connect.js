@@ -19,17 +19,26 @@ const Peer = require('../../../logic/peer');
 
 const logs = require('./logs');
 
+let peersUpdateRules;
+let wampServer;
+
 class Connect {
-	constructor(wampClient, wampServer, peersUpdateRules) {
+	constructor(wampClient) {
 		this.wampClient = wampClient;
-		this.wampServer = wampServer;
-		this.peersUpdateRules = peersUpdateRules;
+	}
+
+	setWampServer(__wampServer) {
+		wampServer = __wampServer;
+	}
+
+	setPeersUpdateRules(__peersUpdateRules) {
+		peersUpdateRules = __peersUpdateRules;
 	}
 
 	// Private
 	upgradeSocket(socket) {
 		this.wampClient.upgradeToWAMP(socket);
-		this.wampServer.upgradeToWAMP(socket);
+		wampServer.upgradeToWAMP(socket);
 	}
 
 	registerSocketListeners(socket, peerObject) {
@@ -37,7 +46,7 @@ class Connect {
 		// Possible ToDo: connection timeout listener to discard/notify about success through callback
 		socket.on('connect', () => {
 			logs.listeners.connect(peer);
-			connections.insert(peer, socket, this.peersUpdateRules);
+			connections.insert(peer, socket, peersUpdateRules);
 		});
 
 		socket.on('close', (code, reason) => {
@@ -45,7 +54,7 @@ class Connect {
 			if (socket.destroy) {
 				socket.destroy();
 			}
-			connections.remove(peer, this.peersUpdateRules);
+			connections.remove(peer, peersUpdateRules);
 		});
 
 		socket.on('disconnect', () => {

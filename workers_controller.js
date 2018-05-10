@@ -68,7 +68,7 @@ SCWorker.create({
 					const TIMEOUT = 10000; // Timeout failed client requests after 1 second
 					return cb(
 						null,
-						new Connect(new WAMPClient(TIMEOUT), null, null)
+						new Connect(new WAMPClient(TIMEOUT))
 					);
 				},
 				client: [
@@ -84,7 +84,7 @@ SCWorker.create({
 							self,
 							20e3,
 							(err, slaveWAMPServer) => {
-								scope.connect.wampServer = slaveWAMPServer;
+								scope.connect.setWampServer(slaveWAMPServer);
 								cb(null, slaveWAMPServer);
 							},
 							scope.client.onRPCRequest,
@@ -104,7 +104,7 @@ SCWorker.create({
 					'slaveWAMPServer',
 					function(scope, cb) {
 						const peersUpdateRules = new PeersUpdateRules(scope.slaveWAMPServer);
-						scope.connect.wampServer = scope.slaveWAMPServer;
+						scope.connect.setPeersUpdateRules(peersUpdateRules);
 						cb(null, peersUpdateRules);
 					},
 				],

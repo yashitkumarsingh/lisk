@@ -55,7 +55,7 @@ PeersUpdateRules.prototype.insertOnMaster = function(peer, cb) {
 	peer.state = Peer.STATE.CONNECTED;
 	self.slaveToMasterSender.send(
 		'updatePeer',
-		Rules.UPDATES.INSERT,
+		PeersUpdateRules.UPDATES.INSERT,
 		peer,
 		err => {
 			if (err) {
@@ -80,7 +80,7 @@ PeersUpdateRules.prototype.insertOnMaster = function(peer, cb) {
 PeersUpdateRules.prototype.removeOnMaster = function(peer, cb) {
 	self.slaveToMasterSender.send(
 		'updatePeer',
-		Rules.UPDATES.REMOVE,
+		PeersUpdateRules.UPDATES.REMOVE,
 		peer,
 		err => {
 			if (err && !err.code) {
@@ -120,6 +120,7 @@ PeersUpdateRules.prototype.external = {
 				return console.error('External update request called without pre-handshake process');
 			}
 			const peerString = request.peerObject.ip + ':' + request.peerObject.wsPort;
+			// ToDo: Comparision with passed ip address must go here
 			if (!connections[peerString]) {
 				return setImmediate(
 					cb,
