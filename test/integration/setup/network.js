@@ -20,6 +20,8 @@ var waitUntilBlockchainReady = require('../../common/utils/wait_for')
 	.blockchainReady;
 var utils = require('../utils');
 
+var broadcastingDisabled = process.env.BROADCASTING_DISABLED === 'true';
+
 module.exports = {
 	waitForAllNodesToBeReady(configurations, cb) {
 		async.forEachOf(
@@ -38,15 +40,27 @@ module.exports = {
 
 	enableForgingOnDelegates(configurations, cb) {
 		var enableForgingPromises = [];
-		configurations.forEach(configuration => {
-			configuration.forging.secret.map(keys => {
+		if (broadcastingDisabled) {
+			// Picking the default forging node 4000
+			var forgingNode = configurations.find(config => config.httpPort === 4000);
+			forgingNode.forging.secret.map(keys => {
 				var enableForgingPromise = utils.http.enableForging(
 					keys,
-					configuration.httpPort
+					forgingNode.httpPort
 				);
 				enableForgingPromises.push(enableForgingPromise);
 			});
-		});
+		} else {
+			configurations.forEach(configuration => {
+				configuration.forging.secret.map(keys => {
+					var enableForgingPromise = utils.http.enableForging(
+						keys,
+						configuration.httpPort
+					);
+					enableForgingPromises.push(enableForgingPromise);
+				});
+			});
+		}
 		Promise.all(enableForgingPromises)
 			.then(forgingResults => {
 				return cb(

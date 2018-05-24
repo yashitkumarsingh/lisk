@@ -29,7 +29,7 @@ module.exports = function(params) {
 	describe('stress test for type 5 transactions @slow', () => {
 		var transactions = [];
 		var accounts = [];
-		var maximum = 500;
+		var maximum = 1000;
 		var waitForExtraBlocks = 4;
 
 		describe('prepare accounts', () => {
@@ -52,7 +52,7 @@ module.exports = function(params) {
 
 			it('should confirm all transactions on all nodes', done => {
 				var blocksToWait =
-					Math.ceil(maximum / constants.maxTransactionsPerBlock)  + waitForExtraBlocks;
+					Math.ceil(maximum / constants.maxTransactionsPerBlock) + waitForExtraBlocks;
 				waitFor.blocks(blocksToWait, () => {
 					confirmTransactionsOnAllNodes(transactions, params).then(done);
 				});
@@ -86,7 +86,7 @@ module.exports = function(params) {
 
 			it('should confirm all transactions on all nodes', done => {
 				var blocksToWait =
-					Math.ceil(maximum / constants.maxTransactionsPerBlock)  + waitForExtraBlocks;
+					Math.ceil(maximum / constants.maxTransactionsPerBlock) + waitForExtraBlocks;
 				waitFor.blocks(blocksToWait, () => {
 					confirmTransactionsOnAllNodes(transactions, params).then(done);
 				});
