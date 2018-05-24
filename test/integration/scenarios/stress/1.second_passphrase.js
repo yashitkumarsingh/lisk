@@ -29,7 +29,8 @@ module.exports = function(params) {
 	describe('stress test for type 1 transactions @slow', () => {
 		var transactions = [];
 		var accounts = [];
-		var maximum = 1000;
+		var maximum = 500;
+		var waitForExtraBlocks = 4;
 
 		describe('prepare accounts', () => {
 			before(() => {
@@ -51,7 +52,7 @@ module.exports = function(params) {
 
 			it('should confirm all transactions on all nodes', done => {
 				var blocksToWait =
-					Math.ceil(maximum / constants.maxTransactionsPerBlock) + 2;
+					Math.ceil(maximum / constants.maxTransactionsPerBlock)  + waitForExtraBlocks;
 				waitFor.blocks(blocksToWait, () => {
 					confirmTransactionsOnAllNodes(transactions, params).then(done);
 				});
@@ -75,7 +76,7 @@ module.exports = function(params) {
 
 			it('should confirm all transactions on all nodes', done => {
 				var blocksToWait =
-					Math.ceil(maximum / constants.maxTransactionsPerBlock) + 2;
+					Math.ceil(maximum / constants.maxTransactionsPerBlock)  + waitForExtraBlocks;
 				waitFor.blocks(blocksToWait, () => {
 					confirmTransactionsOnAllNodes(transactions, params).then(done);
 				});

@@ -41,6 +41,14 @@ describe('given configurations for 10 nodes with address "127.0.0.1", WS ports 5
 			if (!devConfigCopy.syncing) {
 				devConfigCopy.syncing = {};
 			}
+			if (syncingDisabled && !broadcastingDisabled) {
+				// When all the nodes in network is broadcast enabled
+				// and syncing disabled then all the nodes in the network
+				// doesn't receive the block/transactions with 2 relays
+				// So we need to increase the relay limit to ensure all
+				// the peers in network receives block/transactions
+				devConfigCopy.broadcasts.relayLimit = 4;
+			}
 			devConfigCopy.syncing.active = !syncingDisabled;
 			return devConfigCopy;
 		});
@@ -66,6 +74,13 @@ describe('given configurations for 10 nodes with address "127.0.0.1", WS ports 5
 					devConfig.forging.secret.length / configurations.length
 				);
 				var secrets = _.clone(devConfig.forging.secret);
+
+				if (broadcastingDisabled) {
+					return configurations.forEach(configuration => {
+						configuration.forging.force = false;
+						configuration.forging.secret = secrets;
+					});
+				}
 
 				return configurations.forEach((configuration, index) => {
 					configuration.forging.force = false;
@@ -112,22 +127,22 @@ describe('given configurations for 10 nodes with address "127.0.0.1", WS ports 5
 						);
 					});
 
-					scenarios.network.peers(params);
+					// scenarios.network.peers(params);
 
 					describe('when functional tests are successfully executed against 127.0.0.1:5000', () => {
-						before(done => {
-							setup.shell.runMochaTests(
-								[
-									'test/functional/http/get/blocks.js',
-									'test/functional/http/get/transactions.js',
-								],
-								done
-							);
-						});
+						// before(done => {
+						// 	setup.shell.runMochaTests(
+						// 		[
+						// 			'test/functional/http/get/blocks.js',
+						// 			'test/functional/http/get/transactions.js',
+						// 		],
+						// 		done
+						// 	);
+						// });
 
-						scenarios.propagation.blocks(params);
-						scenarios.propagation.transactions(params);
-						scenarios.propagation.multisignature(params);
+						// scenarios.propagation.blocks(params);
+						// scenarios.propagation.transactions(params);
+						// scenarios.propagation.multisignature(params);
 						scenarios.stress.transfer(params);
 						scenarios.stress.transfer_with_data(params);
 						scenarios.stress.register_multisignature(params);

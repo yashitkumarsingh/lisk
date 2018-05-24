@@ -29,49 +29,8 @@ var confirmTransactionsOnAllNodes = require('../common/stress')
 module.exports = function(params) {
 	describe('stress test for type 0 transactions with data @slow', () => {
 		var transactions = [];
-		var maximum = 1000;
-
-		describe('sending 1000 bundled transfers to random addresses', () => {
-			var count = 1;
-
-			before(done => {
-				async.doUntil(
-					next => {
-						var bundled = [];
-						for (
-							var i = 0;
-							i < params.configurations[0].broadcasts.releaseLimit;
-							i++
-						) {
-							var transaction = lisk.transaction.transfer({
-								amount: randomUtil.number(100000000, 1000000000),
-								passphrase: accountFixtures.genesis.password,
-								recipientId: randomUtil.account().address,
-								data: randomUtil.dataField(64),
-							});
-							transactions.push(transaction);
-							bundled.push(transaction);
-							count++;
-						}
-						sendTransactionsPromise(bundled).then(next);
-					},
-					() => {
-						return count >= maximum;
-					},
-					() => {
-						done();
-					}
-				);
-			});
-
-			it('should confirm all transactions on all nodes', done => {
-				var blocksToWait =
-					Math.ceil(maximum / constants.maxTransactionsPerBlock) + 2;
-				waitFor.blocks(blocksToWait, () => {
-					confirmTransactionsOnAllNodes(transactions, params).then(done);
-				});
-			});
-		});
+		var maximum = 500;
+		var waitForExtraBlocks = 4;
 
 		describe('sending 1000 single transfers to random addresses', () => {
 			before(() => {
@@ -92,7 +51,7 @@ module.exports = function(params) {
 
 			it('should confirm all transactions on all nodes', done => {
 				var blocksToWait =
-					Math.ceil(maximum / constants.maxTransactionsPerBlock) + 2;
+					Math.ceil(maximum / constants.maxTransactionsPerBlock) +  waitForExtraBlocks;
 				waitFor.blocks(blocksToWait, () => {
 					confirmTransactionsOnAllNodes(transactions, params).then(done);
 				});
