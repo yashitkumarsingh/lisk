@@ -162,7 +162,7 @@ __private.syncTimer = function() {
 		) {
 			library.sequence.add(
 				sequenceCb => {
-					__private.sync(sequenceCb);
+					Loader.prototype.sync(sequenceCb);
 				},
 				err => {
 					if (err) {
@@ -752,7 +752,7 @@ __private.loadBlocksFromNetwork = function(cb) {
  * @todo Check err actions
  * @todo Add description for the params
  */
-__private.sync = function(cb) {
+Loader.prototype.sync = function(cb) {
 	library.logger.info('Starting sync');
 	library.bus.message('syncStarted');
 
