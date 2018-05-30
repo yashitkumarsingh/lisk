@@ -248,33 +248,53 @@ __private.forge = function(cb) {
 		return setImmediate(cb);
 	}
 
-	__private.getBlockSlotData(
-		currentSlot,
-		lastBlock.height + 1,
-		(err, currentBlockData) => {
-			if (err || currentBlockData === null) {
+	// Get blockSlotData for current Slot and next slot for all cases except the last block of the round
+	// (because the delegate list will be different for the next block afte rthe last block of the round)
+	const heightsForBlockData =
+		(lastBlock.height + 1) % 101 === 0
+			? [lastBlock.height + 1]
+			: [lastBlock.height + 1, lastBlock.height + 2];
+
+	async.map(
+		heightsForBlockData,
+		(height, mapCb) => __private.getBlockSlotData(currentSlot, height, mapCb),
+		(err, blocksDataForCurrentAndNextSlot) => {
+			const currentBlockData = blocksDataForCurrentAndNextSlot[0];
+			const nextBlockData = blocksDataForCurrentAndNextSlot[1];
+
+			if (err || (nextBlockData === null && currentBlockData === null)) {
 				library.logger.warn('Skipping delegate slot', err);
 				return setImmediate(cb);
 			}
 
 			if (
-				slots.getSlotNumber(currentBlockData.time) !== slots.getSlotNumber()
+				modules.transport.poorConsensus() &&
+				(slots.getSlotNumber(nextBlockData.time) === currentSlot ||
+					slots.getSlotNumber(currentBlockData.time) === currentSlot)
 			) {
-				library.logger.debug('Delegate slot', slots.getSlotNumber());
-				return setImmediate(cb);
-			}
-
-			if (modules.transport.poorConsensus()) {
 				const consensusErr = [
 					'Inadequate broadhash consensus before forging a block:',
 					modules.peers.getLastConsensus(),
 					'%',
 				].join(' ');
 
-				library.logger.error(
-					'Failed to generate block within delegate slot',
-					consensusErr
-				);
+				if (slots.getSlotNumber(currentBlockData.time) === currentSlot) {
+					library.logger.error(
+						'Failed to generate block within delegate slot',
+						consensusErr
+					);
+				}
+
+				library.logger.info('Triggering sync due to poor consensus');
+
+				// Can safetly call sync without checking if it's already running becasue
+				// a- we are already part of balance sequence
+				// b- we have already checked it before the start of this function.
+				return modules.loader.sync(cb);
+			}
+
+			if (slots.getSlotNumber(currentBlockData.time) !== currentSlot) {
+				library.logger.debug('Delegate slot', currentSlot);
 				return setImmediate(cb);
 			}
 
