@@ -282,19 +282,8 @@ describe('handshake', () => {
 			beforeEach(function(done) {
 				connect();
 				wampClient.upgradeToWAMP(clientSocket);
-				setTimeout(() => {
-					validClientSocketOptions.query.state = 1;
-					validClientSocketOptions.query.ip = '127.0.0.1';
-					clientSocket
-						.call('updateMyself', validClientSocketOptions.query)
-						.then(() => {
-							done();
-						})
-						.catch(err => {
-							done(err);
-						});
-				}, 1000);
 				this.timeout(2000);
+				done();
 			});
 
 			afterEach(() => {

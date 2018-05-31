@@ -29,7 +29,6 @@ describe('WS transport blocks', () => {
 		wampServer.registerRPCEndpoints({
 			blocks: () => {},
 			blocksCommon: () => {},
-			updateMyself: () => {},
 		});
 		wampServer.registerEventEndpoints({
 			postBlock: () => {},

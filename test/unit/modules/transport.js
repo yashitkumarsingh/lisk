@@ -999,9 +999,6 @@ describe('transport', () => {
 			peersList = [];
 			for (var i = 0; i < 10; i++) {
 				var peer = generateRandomActivePeer();
-				peer.rpc = {
-					updateMyself: sinonSandbox.stub().callsArg(1),
-				};
 				peersList.push(peer);
 			}
 
@@ -1342,96 +1339,6 @@ describe('transport', () => {
 							library.network.io.sockets.emit.calledWith(
 								'transactions/change',
 								transaction
-							)
-						).to.be.true;
-					});
-				});
-			});
-		});
-
-		describe('broadcastHeaders', () => {
-			beforeEach(done => {
-				transportInstance.broadcastHeaders(done);
-			});
-
-			it('should call ibrary.logic.peers.listRandomConnected with {limit: constants.maxPeers}', () => {
-				expect(library.logic.peers.listRandomConnected.calledOnce).to.be.true;
-				return expect(
-					library.logic.peers.listRandomConnected.calledWith({
-						limit: constants.maxPeers,
-					})
-				).to.be.true;
-			});
-
-			describe('when peers.length = 0', () => {
-				beforeEach(done => {
-					library.logic.peers.listRandomConnected = sinonSandbox
-						.stub()
-						.returns([]);
-					transportInstance.broadcastHeaders(done);
-				});
-
-				it('should call library.logger.debug with proper message', () => {
-					return expect(
-						library.logger.debug.calledWith(
-							'Transport->broadcastHeaders: No peers found'
-						)
-					).to.be.true;
-				});
-			});
-
-			describe('for every filtered peer in peers', () => {
-				it('should call peer.rpc.updateMyself with the result of library.logic.peers.me()', () => {
-					return peersList.forEach(peer => {
-						expect(peer.rpc.updateMyself.calledOnce).to.be.true;
-						expect(peer.rpc.updateMyself.calledWith(library.logic.peers.me()))
-							.to.be.true;
-					});
-				});
-
-				describe('when peer.rpc.updateMyself fails', () => {
-					const error = 'RPC failure';
-
-					beforeEach(done => {
-						peerMock = generateRandomActivePeer();
-						peerMock.rpc = {
-							updateMyself: sinonSandbox.stub().callsArgWith(1, error),
-						};
-						library.logic.peers.listRandomConnected = sinonSandbox
-							.stub()
-							.returns([peerMock]);
-						__private.removePeer = sinonSandbox.stub();
-						transportInstance.broadcastHeaders(done);
-					});
-
-					it('should call library.logger.debug with proper message', () => {
-						return expect(
-							library.logger.debug.calledWith(
-								'Transport->broadcastHeaders: Failed to notify peer about self',
-								{ peer: peerMock.string, err: error }
-							)
-						).to.be.true;
-					});
-				});
-
-				describe('when peer.rpc.updateMyself succeeds', () => {
-					beforeEach(done => {
-						peerMock = generateRandomActivePeer();
-						peerMock.rpc = {
-							updateMyself: sinonSandbox.stub().callsArg(1),
-						};
-						modules.peers.list = sinonSandbox
-							.stub()
-							.callsArgWith(1, null, [peerMock]);
-						__private.removePeer = sinonSandbox.stub();
-						transportInstance.broadcastHeaders(done);
-					});
-
-					it('should call library.logger.debug with proper message', () => {
-						return expect(
-							library.logger.debug.calledWith(
-								'Transport->broadcastHeaders: Successfully notified peer about self',
-								{ peer: peerMock.string }
 							)
 						).to.be.true;
 					});

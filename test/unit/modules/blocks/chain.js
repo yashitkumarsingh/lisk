@@ -152,10 +152,6 @@ describe('blocks/chain', () => {
 			update: sinonSandbox.stub(),
 		};
 
-		const modulesTransportStub = {
-			broadcastHeaders: sinonSandbox.stub(),
-		};
-
 		const modulesTransactionsStub = {
 			applyUnconfirmed: sinonSandbox.stub(),
 			apply: sinonSandbox.stub(),
@@ -172,7 +168,6 @@ describe('blocks/chain', () => {
 			rounds: modulesRoundsStub,
 			transactions: modulesTransactionsStub,
 			system: modulesSystemStub,
-			transport: modulesTransportStub,
 		};
 
 		process.exit = sinonSandbox.stub().returns(0);
@@ -1524,7 +1519,6 @@ describe('blocks/chain', () => {
 			popLastBlockTemp = __private.popLastBlock;
 			__private.popLastBlock = sinonSandbox.stub();
 			modules.system.update.callsArgWith(0, null, true);
-			modules.transport.broadcastHeaders.callsArgWith(0, null, true);
 			done();
 		});
 
@@ -1612,7 +1606,6 @@ describe('blocks/chain', () => {
 							);
 							expect(modules.blocks.lastBlock.set.calledOnce).to.be.true;
 							expect(modules.system.update.calledOnce).to.be.true;
-							expect(modules.transport.broadcastHeaders.calledOnce).to.be.true;
 							done();
 						});
 					});
@@ -1633,7 +1626,6 @@ describe('blocks/chain', () => {
 							expect(newLastBlock).to.deep.equal(blockWithTransactions);
 							expect(modules.blocks.lastBlock.set.calledOnce).to.be.true;
 							expect(modules.system.update.calledOnce).to.be.true;
-							expect(modules.transport.broadcastHeaders.calledOnce).to.be.true;
 							done();
 						});
 					});

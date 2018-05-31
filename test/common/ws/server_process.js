@@ -61,7 +61,6 @@ WSServer.prototype.start = function() {
 		if (self.socketCluster) {
 			reject(new Error('SocketCluster instance is already running'));
 		}
-
 		self.socketCluster = new SocketCluster(self.options);
 
 		self.socketCluster.on('ready', () => {
@@ -94,7 +93,6 @@ WSServer.prototype.start = function() {
 				blocksCommon: sandbox
 					.stub()
 					.callsArgWith(1, null, { success: true, common: null }),
-				updateMyself: sandbox.stub().callsArgWith(1, null),
 			});
 
 			self.socketClient.start();
