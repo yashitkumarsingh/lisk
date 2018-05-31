@@ -74,16 +74,6 @@ SCWorker.create({
 					},
 				],
 
-				registerRPCSlaveEndpoints: [
-					'peersUpdateRules',
-					function(scope, cb) {
-						scope.slaveWAMPServer.reassignRPCSlaveEndpoints({
-							updateMyself: scope.peersUpdateRules.external.update,
-						});
-						cb();
-					},
-				],
-
 				system: [
 					'config',
 					function(scope, cb) {
