@@ -90,10 +90,6 @@ describe('blocks/verify', () => {
 			update: sinonSandbox.stub(),
 		};
 
-		const modulesTransportStub = {
-			broadcastHeaders: sinonSandbox.stub(),
-		};
-
 		const modulesBlocksStub = {
 			lastBlock: {
 				get: sinonSandbox.stub(),
@@ -113,7 +109,6 @@ describe('blocks/verify', () => {
 			delegates: modulesDelegatesStub,
 			transactions: modulesTransactionsStub,
 			system: modulesSystemStub,
-			transport: modulesTransportStub,
 		};
 
 		blocksVerifyModule.onBind(modulesStub);
@@ -1920,7 +1915,6 @@ describe('blocks/verify', () => {
 				.callsArgWith(2, null, true);
 			modules.blocks.chain.applyBlock.callsArgWith(2, null, true);
 			modules.system.update.callsArgWith(0, null, true);
-			modules.transport.broadcastHeaders.callsArgWith(0, null, true);
 			done();
 		});
 
@@ -1958,7 +1952,6 @@ describe('blocks/verify', () => {
 						err => {
 							expect(err).to.be.null;
 							expect(modules.system.update.calledOnce).to.be.true;
-							expect(modules.transport.broadcastHeaders.calledOnce).to.be.true;
 							expect(__private.checkExists).to.have.been.calledWith(dummyBlock);
 							done();
 						}
@@ -1977,7 +1970,6 @@ describe('blocks/verify', () => {
 						err => {
 							expect(err).to.be.null;
 							expect(modules.system.update.calledOnce).to.be.true;
-							expect(modules.transport.broadcastHeaders.calledOnce).to.be.true;
 							expect(__private.checkExists).to.not.called;
 							done();
 						}
@@ -1997,8 +1989,7 @@ describe('blocks/verify', () => {
 						saveBlock,
 						err => {
 							expect(err).to.be.null;
-							expect(modules.system.update.calledOnce).to.be.false;
-							expect(modules.transport.broadcastHeaders.calledOnce).to.be.false;
+							expect(modules.system.update.calledOnce).to.be.true;
 							expect(__private.checkExists).to.have.been.calledWith(dummyBlock);
 							done();
 						}
@@ -2016,8 +2007,7 @@ describe('blocks/verify', () => {
 						saveBlock,
 						err => {
 							expect(err).to.be.null;
-							expect(modules.system.update.calledOnce).to.be.false;
-							expect(modules.transport.broadcastHeaders.calledOnce).to.be.false;
+							expect(modules.system.update.calledOnce).to.be.true;
 							expect(__private.checkExists).to.not.called;
 							done();
 						}

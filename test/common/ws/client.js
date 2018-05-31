@@ -35,6 +35,7 @@ function WSClient(headers = WSServerMaster.generatePeerHeaders()) {
  */
 WSClient.prototype.start = function() {
 	System.setHeaders(this.headers);
+
 	this.client = connect(
 		{
 			ip: testConfig.address,
@@ -48,10 +49,9 @@ WSClient.prototype.start = function() {
 		},
 		this.stop.bind(this)
 	);
-	// Call updateMyself RPC on the peer to:
-	// 1. Initialize the connection.
-	// 2. Send our headers to the peer.
-	this.client.rpc.updateMyself(this.headers, () => {});
+
+	// Call status RPC on the peer to initialize the connection.
+	this.client.socket.call('status', {});
 };
 
 /**

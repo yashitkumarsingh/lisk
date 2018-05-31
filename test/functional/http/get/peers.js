@@ -33,6 +33,15 @@ describe('GET /peers', () => {
 					wsServer2.stop();
 				});
 			})
+			.then(() => {
+				// Add delay to give peers time to fetch each other's headers.
+				// This is dependent on the peerDiscoveryFrequency value.
+				return new Promise(resolve => {
+					setTimeout(() => {
+						resolve();
+					}, 10000);
+				});
+			})
 			.catch(() => {
 				wsServer1.stop();
 			});

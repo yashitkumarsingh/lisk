@@ -65,7 +65,6 @@ var wsServer = {
 		blocks: sinonSandbox.stub().callsArgWith(1, { blocks: [] }),
 		getSignatures: sinonSandbox.stub().callsArgWith(1, { signatures: [] }),
 		getTransactions: sinonSandbox.stub().callsArgWith(1, { transactions: [] }),
-		updateMyself: sinonSandbox.stub().callsArgWith(1, null),
 		postTransactions: sinonSandbox.stub().callsArgWith(1, null),
 		postSignatures: sinonSandbox.stub().callsArgWith(1, null),
 		postBlock: sinonSandbox

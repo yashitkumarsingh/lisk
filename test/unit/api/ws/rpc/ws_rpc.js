@@ -21,7 +21,6 @@ const expect = chai.expect;
 
 const ws_rpc = rewire('../../../../../api/ws/rpc/ws_rpc');
 const wsRPC = ws_rpc.wsRPC;
-const slaveRPCStub = ws_rpc.slaveRPCStub;
 
 var result;
 var serverMock;
@@ -107,25 +106,6 @@ describe('ws_rpc', () => {
 						return expect(error).to.be.an.instanceOf(Error);
 					});
 				});
-			});
-		});
-	});
-
-	describe('slaveRPCStub', () => {
-		describe('updateMyself', () => {
-			beforeEach(done => {
-				error = null;
-				try {
-					slaveRPCStub.updateMyself();
-				} catch (err) {
-					error = err;
-				}
-				done();
-			});
-
-			// Cannot be invoked directly.
-			it('should throw an error', () => {
-				return expect(error).to.be.an.instanceOf(Error);
 			});
 		});
 	});
