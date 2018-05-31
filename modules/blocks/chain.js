@@ -760,10 +760,6 @@ Chain.prototype.deleteLastBlock = function(cb) {
 				// Update our own headers: broadhash and height
 				modules.system.update(seriesCb);
 			},
-			broadcastHeaders(seriesCb) {
-				// Notify all remote peers about our new headers
-				modules.transport.broadcastHeaders(seriesCb);
-			},
 			receiveTransactions(seriesCb) {
 				// Put transactions back into transaction pool
 				modules.transactions.receiveTransactions(

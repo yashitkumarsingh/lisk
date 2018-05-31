@@ -370,51 +370,6 @@ Transport.prototype.onUnconfirmedTransaction = function(
 };
 
 /**
- * Update all remote peers with our headers
- *
- * @param {function} cb - Callback function
- * @returns {setImmediateCallback} cb
- */
-Transport.prototype.broadcastHeaders = cb => {
-	// Grab a random list of connected peers.
-	const peers = library.logic.peers.listRandomConnected({
-		limit: constants.maxPeers,
-	});
-
-	if (peers.length === 0) {
-		library.logger.debug('Transport->broadcastHeaders: No peers found');
-		return setImmediate(cb);
-	}
-
-	library.logger.debug(
-		'Transport->broadcastHeaders: Broadcasting headers to remote peers',
-		{ count: peers.length }
-	);
-
-	// Execute remote procedure updateMyself for every peer
-	async.each(
-		peers,
-		(peer, eachCb) => {
-			peer.rpc.updateMyself(library.logic.peers.me(), err => {
-				if (err) {
-					library.logger.debug(
-						'Transport->broadcastHeaders: Failed to notify peer about self',
-						{ peer: peer.string, err }
-					);
-				} else {
-					library.logger.debug(
-						'Transport->broadcastHeaders: Successfully notified peer about self',
-						{ peer: peer.string }
-					);
-				}
-				return eachCb();
-			});
-		},
-		() => setImmediate(cb)
-	);
-};
-
-/**
  * Calls broadcast blocks and emits a 'blocks/change' socket message.
  *
  * @param {Object} block - Reduced block object
