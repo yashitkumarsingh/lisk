@@ -377,10 +377,9 @@ Transport.prototype.onUnconfirmedTransaction = function(
  */
 Transport.prototype.broadcastHeaders = cb => {
 	// Grab a random list of connected peers.
-	const peers = library.logic.peers.listRandomConnected({
-		limit: constants.maxPeers,
+	const peers = modules.peers.list({
+		limit: Number.MAX_SAFE_INTEGER
 	});
-
 	if (peers.length === 0) {
 		library.logger.debug('Transport->broadcastHeaders: No peers found');
 		return setImmediate(cb);
