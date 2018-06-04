@@ -543,6 +543,7 @@ Peers.prototype.discover = function(cb) {
 		return setImmediate(waterCb, null, picked);
 	}
 
+	const discoveredPeers = [];
 	/**
 	 * Description of updatePeers.
 	 *
@@ -567,7 +568,9 @@ Peers.prototype.discover = function(cb) {
 					// Set peer state to disconnected
 					peer.state = Peer.STATE.DISCONNECTED;
 					// We rely on data from other peers only when new peer is discovered for the first time
-					library.logic.peers.upsert(peer, true);
+					if (library.logic.peers.upsert(peer, true)) {
+						discoveredPeers.push(peer);
+					}
 					return setImmediate(eachCb);
 				});
 			},
@@ -580,7 +583,7 @@ Peers.prototype.discover = function(cb) {
 
 	async.waterfall(
 		[getFromRandomPeer, validatePeersList, pickPeers, updatePeers],
-		err => setImmediate(cb, err)
+		err => setImmediate(cb, err, discoveredPeers)
 	);
 };
 
@@ -774,11 +777,11 @@ Peers.prototype.onPeersReady = function() {
 				 */
 				discoverPeers(seriesCb) {
 					library.logger.trace('Discovering new peers...');
-					self.discover(err => {
+					self.discover((err, discoveredPeers) => {
 						if (err) {
 							library.logger.error('Discovering new peers failed', err);
 						}
-						return setImmediate(seriesCb);
+						return setImmediate(seriesCb, discoveredPeers);
 					});
 				},
 
@@ -788,29 +791,33 @@ Peers.prototype.onPeersReady = function() {
 				 * @todo Add @param tags
 				 * @todo Add @returns tag
 				 */
-				updatePeers(seriesCb) {
+				updatePeers(seriesCb, discoveredPeers) {
 					let updated = 0;
-					const peers = library.logic.peers.list();
 
-					library.logger.trace('Updating peers', { count: peers.length });
+					library.logger.trace('Updating peers', {
+						count: discoveredPeers.length,
+					});
 
 					async.each(
-						peers,
-						(peer, eachCb) => {
+						discoveredPeers,
+						(discoveredPeer, eachCb) => {
 							// If peer is not banned and not been updated during last 3 sec - ping
 							if (
-								peer &&
-								peer.state > 0 &&
-								(!peer.updated || Date.now() - peer.updated > 3000)
+								discoveredPeer &&
+								discoveredPeer.state > 0 &&
+								(!discoveredPeer.updated ||
+									Date.now() - discoveredPeer.updated > 3000)
 							) {
-								library.logger.trace('Updating peer', peer.object());
-								peer.rpc.status((err, status) => {
-									__private.updatePeerStatus(err, status, peer);
+								library.logger.trace('Updating peer', discoveredPeer.object());
+								discoveredPeer.rpc.status((err, status) => {
+									__private.updatePeerStatus(err, status, discoveredPeer);
 									if (!err) {
 										updated += 1;
 									} else {
 										library.logger.trace(
-											`Every 10sec peers check ping peer failed ${peer.string}`,
+											`Failed to get the status of newly discovered Peer ${
+												discoveredPeer.string
+											}`,
 											err
 										);
 									}
@@ -823,7 +830,7 @@ Peers.prototype.onPeersReady = function() {
 						() => {
 							library.logger.trace('Peers updated', {
 								updated,
-								total: peers.length,
+								total: discoveredPeers.length,
 							});
 							return setImmediate(seriesCb);
 						}
